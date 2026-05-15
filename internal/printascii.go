@@ -11,7 +11,7 @@ import (
 // separated by a blank line (9 lines per character total).
 // Empty lines in the input produce a single blank line in the output,
 // except for the first element which is skipped if empty.
-func PrintAscii(lines []string, filename string) error {
+func PrintAscii(color string, part string, lines []string, filename string) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("could not open banner file: %w", err)
@@ -36,24 +36,33 @@ func PrintAscii(lines []string, filename string) error {
 			continue
 		}
 
+		start := strings.Index(line, part)
+		end := start + len(part)
 		// Print all 8 rows of ASCII art for this line of text.
 		// Each character c occupies rows [(c-32)*9+1] to [(c-32)*9+8]
 		// in the banner file (ASCII printable range starts at 32 = space).
 		for row := 1; row <= 8; row++ {
 			var sb strings.Builder
-			for _, r := range line {
+			for i, r := range line {
 				index := (int(r)-32)*9 + row
 
 				// Safety check to avoid out-of-bounds access
 				if /* index < 0 || */ index >= len(bannerLines) {
 					return fmt.Errorf("character %q is out of supported range in banner", r)
 				}
-
-				sb.WriteString(bannerLines[index])
+				if colorizer(i, start, end) {
+					sb.WriteString("\033[31m" + bannerLines[index] + "\033[0m")
+				} else {
+					sb.WriteString(bannerLines[index])
+				}
 			}
 			fmt.Println(sb.String())
 		}
 	}
 
 	return nil
+}
+
+func colorizer(index, start, end int) bool {
+	return index >= start && index < end
 }

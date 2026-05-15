@@ -11,13 +11,15 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
+	if len(os.Args) != 4 {
 		fmt.Println("Error: invalid usage")
-		fmt.Println("Usage: go run ./cmd \"your-text-here\"")
+		fmt.Println("Usage: go run ./cmd --flag:Color \"your-colorizer-here\" \"your-text-here\"") // will be immersive
 		os.Exit(1)
 	}
 
-	text := os.Args[1]
+	flag := os.Args[1]
+	part := os.Args[2]
+	text := os.Args[3]
 
 	// Only printable ASCII characters (32–126) are supported.
 	// Reject anything outside that range (e.g. accented letters, emoji).
@@ -50,12 +52,14 @@ func main() {
 	banners := []string{"banners/standard.txt", "banners/shadow.txt", "banners/thinkertoy.txt"}
 	filename := banners[choice-1]
 
+	color := strings.Split(flag, "=")
+
 	// Split on the literal two-character sequence "\n" (backslash + n),
 	// which is how multi-line input is passed from the command line.
 	// e.g. "Hello\nThere" becomes ["Hello", "There"].
 	lines := strings.Split(text, "\\n")
 
-	err = internal.PrintAscii(lines, filename)
+	err = internal.PrintAscii(color[1], part, lines, filename)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
