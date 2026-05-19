@@ -36,8 +36,11 @@ func PrintAscii(color string, part string, lines []string, filename string) erro
 			continue
 		}
 
-		start := strings.Index(line, part)
-		end := start + len(part)
+		starts := findAll(line, part)
+		end := len(part)
+		if part == "" {
+			end = len(line)
+		}
 		// Print all 8 rows of ASCII art for this line of text.
 		// Each character c occupies rows [(c-32)*9+1] to [(c-32)*9+8]
 		// in the banner file (ASCII printable range starts at 32 = space).
@@ -50,8 +53,8 @@ func PrintAscii(color string, part string, lines []string, filename string) erro
 				if /* index < 0 || */ index >= len(bannerLines) {
 					return fmt.Errorf("character %q is out of supported range in banner", r)
 				}
-				if colorizer(i, start, end) {
-					sb.WriteString("\033[31m" + bannerLines[index] + "\033[0m")
+				if colorizer(i, starts, end) {
+					sb.WriteString(color + bannerLines[index] + "\033[0m")
 				} else {
 					sb.WriteString(bannerLines[index])
 				}
@@ -63,6 +66,30 @@ func PrintAscii(color string, part string, lines []string, filename string) erro
 	return nil
 }
 
-func colorizer(index, start, end int) bool {
-	return index >= start && index < end
+// Will find all part starting index
+func findAll(line, part string) []int {
+	var starts []int
+	offset := 0
+	if part == "" {
+		return []int{0}
+	}
+	for {
+		idx := strings.Index(line[offset:], part)
+		if idx == -1 {
+			break
+		}
+		starts = append(starts, offset+idx)
+		offset += idx + len(part)
+	}
+	return starts
+}
+
+// indicates if you are in colorazation mode
+func colorizer(index int, starts []int, partLen int) bool {
+	for _, start := range starts {
+		if index >= start && index < start+partLen {
+			return true
+		}
+	}
+	return false
 }
