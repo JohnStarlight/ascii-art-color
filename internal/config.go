@@ -7,8 +7,8 @@ import (
 
 type Config struct {
 	Text       string
-	Color      string
-	Part       string
+	Colors     []string // ANSI codes, parallel to Parts (one per --color flag, in order)
+	Parts      []string
 	OutputFile string
 	BannerPath string
 }
@@ -26,7 +26,8 @@ func ParseArgs(args []string) (Config, error) {
 		return Config{}, usageError()
 	}
 
-	var colorFlag, outputFlag string
+	var colorFlags []string
+	var outputFlag string
 	var positionals []string
 	outputProvided := false
 
@@ -34,10 +35,11 @@ func ParseArgs(args []string) (Config, error) {
 		lower := strings.ToLower(arg)
 		switch {
 		case strings.HasPrefix(lower, "--color="):
-			colorFlag = arg[len("--color="):]
-			if colorFlag == "" {
+			value := arg[len("--color="):]
+			if value == "" {
 				return Config{}, colorUsageError()
 			}
+			colorFlags = append(colorFlags, value)
 		case strings.HasPrefix(lower, "--color"):
 			return Config{}, colorUsageError()
 		case strings.HasPrefix(lower, "--output="):
@@ -52,10 +54,25 @@ func ParseArgs(args []string) (Config, error) {
 		return Config{}, fmt.Errorf("output filename cannot be empty")
 	}
 
-	var text, part string
+	var text string
+	var parts []string
 	banner := "standard"
+	numColors := len(colorFlags)
 
-	if colorFlag != "" {
+	switch {
+	case numColors == 0:
+		switch len(positionals) {
+		case 1:
+			text = positionals[0]
+		case 2:
+			text = positionals[0]
+			banner = strings.ToLower(positionals[1])
+		default:
+			return Config{}, usageError()
+		}
+	case numColors == 1:
+		// Single --color keeps its original, more permissive shape: the
+		// substring is optional (omitting it colors the whole string).
 		switch len(positionals) {
 		case 1:
 			text = positionals[0]
@@ -64,23 +81,30 @@ func ParseArgs(args []string) (Config, error) {
 				text = positionals[0]
 				banner = strings.ToLower(positionals[1])
 			} else {
-				part = positionals[0]
+				parts = []string{positionals[0]}
 				text = positionals[1]
 			}
 		case 3:
-			part = positionals[0]
+			parts = []string{positionals[0]}
 			text = positionals[1]
 			banner = strings.ToLower(positionals[2])
 		default:
 			return Config{}, usageError()
 		}
-	} else {
+	default:
+		// Multiple --color flags: each one requires its own substring, so
+		// positionals must be exactly [SUBSTRING...] [STRING] [BANNER]?.
 		switch len(positionals) {
-		case 1:
-			text = positionals[0]
-		case 2:
-			text = positionals[0]
-			banner = strings.ToLower(positionals[1])
+		case numColors + 1:
+			parts = append([]string{}, positionals[:numColors]...)
+			text = positionals[numColors]
+		case numColors + 2:
+			if _, ok := bannerFiles[strings.ToLower(positionals[numColors+1])]; !ok {
+				return Config{}, usageError()
+			}
+			parts = append([]string{}, positionals[:numColors]...)
+			text = positionals[numColors]
+			banner = strings.ToLower(positionals[numColors+1])
 		default:
 			return Config{}, usageError()
 		}
@@ -95,19 +119,23 @@ func ParseArgs(args []string) (Config, error) {
 		return Config{}, err
 	}
 
-	var color string
-	if colorFlag != "" {
-		var err error
-		color, err = Palette(colorFlag)
+	var colors []string
+	for _, cf := range colorFlags {
+		c, err := Palette(cf)
 		if err != nil {
 			return Config{}, err
 		}
+		colors = append(colors, c)
+	}
+
+	for len(parts) < len(colors) {
+		parts = append(parts, "")
 	}
 
 	return Config{
 		Text:       text,
-		Color:      color,
-		Part:       part,
+		Colors:     colors,
+		Parts:      parts,
 		OutputFile: outputFlag,
 		BannerPath: bannerPath,
 	}, nil
@@ -128,7 +156,9 @@ func usageError() error {
 			"  go run ./cmd --output=<file.txt> [STRING] [BANNER]\n" +
 			"  go run ./cmd --color=<color> [STRING]\n" +
 			"  go run ./cmd --color=<color> [SUBSTRING] [STRING]\n" +
-			"  go run ./cmd --color=<color> [SUBSTRING] [STRING] [BANNER]",
+			"  go run ./cmd --color=<color> [SUBSTRING] [STRING] [BANNER]\n" +
+			"  go run ./cmd --color=<color1> --color=<color2> [SUBSTRING1] [SUBSTRING2] [STRING]\n" +
+			"  go run ./cmd --color=<color1> --color=<color2> [SUBSTRING1] [SUBSTRING2] [STRING] [BANNER]",
 	)
 }
 

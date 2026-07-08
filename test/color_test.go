@@ -64,7 +64,7 @@ func TestPaletteInvalidRGB(t *testing.T) {
 func TestPrintAsciiNoColor(t *testing.T) {
 	var buf bytes.Buffer
 
-	err := internal.PrintAscii(&buf, "", "", []string{"Hi"}, "../banners/standard.txt")
+	err := internal.PrintAscii(&buf, nil, nil, []string{"Hi"}, "../banners/standard.txt")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestPrintAsciiWholeStringColored(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	err = internal.PrintAscii(&buf, color, "", []string{"Hi"}, "../banners/standard.txt")
+	err = internal.PrintAscii(&buf, []string{color}, nil, []string{"Hi"}, "../banners/standard.txt")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestPrintAsciiPartialColor(t *testing.T) {
 	}
 
 	// "Hi" with only "H" colored.
-	err = internal.PrintAscii(&buf, color, "H", []string{"Hi"}, "../banners/standard.txt")
+	err = internal.PrintAscii(&buf, []string{color}, []string{"H"}, []string{"Hi"}, "../banners/standard.txt")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestPrintAsciiPartialColor(t *testing.T) {
 
 	// Without coloring, the same input should produce different (uncolored) output.
 	var plainBuf bytes.Buffer
-	err = internal.PrintAscii(&plainBuf, "", "", []string{"Hi"}, "../banners/standard.txt")
+	err = internal.PrintAscii(&plainBuf, nil, nil, []string{"Hi"}, "../banners/standard.txt")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -142,11 +142,11 @@ func TestParseArgsColorWholeString(t *testing.T) {
 	}
 
 	want, _ := internal.Palette("red")
-	if cfg.Color != want {
-		t.Errorf("Color = %q, want %q", cfg.Color, want)
+	if len(cfg.Colors) != 1 || cfg.Colors[0] != want {
+		t.Errorf("Colors = %v, want [%q]", cfg.Colors, want)
 	}
-	if cfg.Part != "" {
-		t.Errorf("Part = %q, want empty", cfg.Part)
+	if len(cfg.Parts) != 1 || cfg.Parts[0] != "" {
+		t.Errorf("Parts = %v, want [\"\"]", cfg.Parts)
 	}
 	if cfg.Text != "Hello" {
 		t.Errorf("Text = %q, want %q", cfg.Text, "Hello")
@@ -159,8 +159,8 @@ func TestParseArgsColorWithSubstring(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if cfg.Part != "ell" {
-		t.Errorf("Part = %q, want %q", cfg.Part, "ell")
+	if len(cfg.Parts) != 1 || cfg.Parts[0] != "ell" {
+		t.Errorf("Parts = %v, want [%q]", cfg.Parts, "ell")
 	}
 	if cfg.Text != "Hello" {
 		t.Errorf("Text = %q, want %q", cfg.Text, "Hello")
@@ -176,11 +176,82 @@ func TestParseArgsColorWithBanner(t *testing.T) {
 	if cfg.BannerPath != "banners/shadow.txt" {
 		t.Errorf("BannerPath = %q, want %q", cfg.BannerPath, "banners/shadow.txt")
 	}
-	if cfg.Part != "" {
-		t.Errorf("Part = %q, want empty", cfg.Part)
+	if len(cfg.Parts) != 1 || cfg.Parts[0] != "" {
+		t.Errorf("Parts = %v, want [\"\"]", cfg.Parts)
 	}
 	if cfg.Text != "Hello" {
 		t.Errorf("Text = %q, want %q", cfg.Text, "Hello")
+	}
+}
+
+func TestParseArgsTwoColors(t *testing.T) {
+	cfg, err := internal.ParseArgs([]string{"prog", "--color=red", "--color=blue", "ell", "lo", "Hello"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	wantRed, _ := internal.Palette("red")
+	wantBlue, _ := internal.Palette("blue")
+	if len(cfg.Colors) != 2 || cfg.Colors[0] != wantRed || cfg.Colors[1] != wantBlue {
+		t.Errorf("Colors = %v, want [%q %q]", cfg.Colors, wantRed, wantBlue)
+	}
+	if len(cfg.Parts) != 2 || cfg.Parts[0] != "ell" || cfg.Parts[1] != "lo" {
+		t.Errorf("Parts = %v, want [ell lo]", cfg.Parts)
+	}
+	if cfg.Text != "Hello" {
+		t.Errorf("Text = %q, want %q", cfg.Text, "Hello")
+	}
+}
+
+func TestParseArgsTwoColorsWithBanner(t *testing.T) {
+	cfg, err := internal.ParseArgs([]string{"prog", "--color=red", "--color=blue", "ell", "lo", "Hello", "shadow"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.BannerPath != "banners/shadow.txt" {
+		t.Errorf("BannerPath = %q, want %q", cfg.BannerPath, "banners/shadow.txt")
+	}
+	if cfg.Text != "Hello" {
+		t.Errorf("Text = %q, want %q", cfg.Text, "Hello")
+	}
+}
+
+func TestParseArgsTwoColorsMissingSubstring(t *testing.T) {
+	_, err := internal.ParseArgs([]string{"prog", "--color=red", "--color=blue", "Hello"})
+	if err == nil {
+		t.Fatal("expected error when a substring is missing for one of two --color flags, got nil")
+	}
+}
+
+func TestPrintAsciiTwoColors(t *testing.T) {
+	var buf bytes.Buffer
+
+	red, err := internal.Palette("red")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	blue, err := internal.Palette("blue")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// "Hello": "H" red, "lo" blue.
+	err = internal.PrintAscii(&buf, []string{red, blue}, []string{"H", "lo"}, []string{"Hello"}, "../banners/standard.txt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+
+	for i, line := range lines {
+		if !strings.Contains(line, red) {
+			t.Errorf("line %d: expected line to contain red color code, got %q", i, line)
+		}
+		if !strings.Contains(line, blue) {
+			t.Errorf("line %d: expected line to contain blue color code, got %q", i, line)
+		}
 	}
 }
 

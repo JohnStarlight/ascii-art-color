@@ -21,7 +21,7 @@ const (
 
 func PrintAscii(
 	writer io.Writer,
-	color, part string,
+	colors, parts []string,
 	lines []string,
 	filename string,
 ) error {
@@ -49,11 +49,7 @@ func PrintAscii(
 			continue
 		}
 
-		starts := findAll(line, part)
-		partLen := len(part)
-		if color != "" && part == "" {
-			partLen = len(line)
-		}
+		ranges := buildColorRanges(line, colors, parts)
 
 		for row := 1; row <= charHeight; row++ {
 			var sb strings.Builder
@@ -69,7 +65,7 @@ func PrintAscii(
 				}
 
 				segment := bannerLines[index]
-				if color != "" && inColorRange(pos, starts, partLen) {
+				if color := colorAt(pos, ranges); color != "" {
 					sb.WriteString(color + segment + "\033[0m")
 				} else {
 					sb.WriteString(segment)
@@ -81,6 +77,50 @@ func PrintAscii(
 	}
 
 	return nil
+}
+
+type colorRange struct {
+	color   string
+	starts  []int
+	partLen int
+}
+
+// buildColorRanges pairs each color with its substring occurrences in line,
+// preserving flag order so earlier --color flags take priority on overlap.
+func buildColorRanges(line string, colors, parts []string) []colorRange {
+	var ranges []colorRange
+	for i, color := range colors {
+		if color == "" {
+			continue
+
+		}
+
+		var part string
+		if i < len(parts) {
+			part = parts[i]
+		}
+
+		partLen := len(part)
+		if part == "" {
+			partLen = len(line)
+		}
+
+		ranges = append(ranges, colorRange{
+			color:   color,
+			starts:  findAll(line, part),
+			partLen: partLen,
+		})
+	}
+	return ranges
+}
+
+func colorAt(pos int, ranges []colorRange) string {
+	for _, r := range ranges {
+		if inColorRange(pos, r.starts, r.partLen) {
+			return r.color
+		}
+	}
+	return ""
 }
 
 func findAll(line, part string) []int {

@@ -26,6 +26,23 @@ func Palette(color string) (string, error) {
 		if B, err = strconv.Atoi(strings.TrimSpace(vals[2])); err != nil {
 			return "", fmt.Errorf("invalid rgb blue value")
 		}
+	} else if strings.HasPrefix(color, "#") {
+		hex := strings.TrimPrefix(color, "#")
+		if len(hex) != 6 {
+			return "", fmt.Errorf("invalid hex format: expected #RRGGBB")
+		}
+		var err error
+		var r, g, b int64
+		if r, err = strconv.ParseInt(hex[0:2], 16, 0); err != nil {
+			return "", fmt.Errorf("invalid hex red value")
+		}
+		if g, err = strconv.ParseInt(hex[2:4], 16, 0); err != nil {
+			return "", fmt.Errorf("invalid hex green value")
+		}
+		if b, err = strconv.ParseInt(hex[4:6], 16, 0); err != nil {
+			return "", fmt.Errorf("invalid hex blue value")
+		}
+		R, G, B = int(r), int(g), int(b)
 	} else {
 		switch color {
 		case "red":
@@ -40,6 +57,8 @@ func Palette(color string) (string, error) {
 			R, B = 255, 255
 		case "cyan":
 			G, B = 255, 255
+		case "orange":
+			R, G = 255, 165
 		default:
 			return "", fmt.Errorf("unknown color: %s", color)
 		}

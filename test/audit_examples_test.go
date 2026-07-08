@@ -35,7 +35,7 @@ func renderStandard(input string) string {
 
 	lines := strings.Split(input, "\\n") // literal \n as typed on the CLI, not an actual newline
 
-	err := internal.PrintAscii(&buf, "", "", lines, "../banners/standard.txt")
+	err := internal.PrintAscii(&buf, nil, nil, lines, "../banners/standard.txt")
 	if err != nil {
 		panic(err)
 	}
